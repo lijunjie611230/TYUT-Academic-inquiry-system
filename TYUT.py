@@ -12,7 +12,8 @@ import os
 from getpass import getpass
 
 headers = {}  # 全局变量headers
-student_name  = ""
+student_name = "" # 全局变量，存储学生姓名
+
 
 def get_index(lists,strs):
     """
@@ -25,25 +26,35 @@ def get_index(lists,strs):
     return index
 
 
+def get_html(url,data):
+    """获取网页源代码"""
+    data = parse.urlencode(data).encode('gbk')
+    req = request.Request(url, data=data, headers=headers)
+    response = request.urlopen(req)
+    html = response.read().decode('utf-8')
+    return html
+
+
 def login():
     """
     实现用户的登陆
     """
-    print('*' * 21, '欢迎使用太理教务查询系统', '*' * 21)
+    print('*' * 21, '欢迎使用太理教务查询系统', '*' * 17)
     print(' ' * 40, 'directed by Zhu Jiang')
     print('*' * 64)
     while True:
-        student_id = input('输入学号:')
+        student_id = input('输入学号:') # 获取用户的学号
         password = getpass("输入密码(身份证后6位):")  # 该方法不会显示用户输入的密码，但是无法再IDE中的控制端运行，只能在cmd中实现
-        print("正在登录。。。")
+        print("正在登录。。。") # 显示脚本状况
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf8')  # 改变标准输出的默认编码
         # 设置该options以使得selenium在运行是不会弹出浏览器框
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument('--headless')
         chrome_options.add_argument('--disable-gpu')
-        browser = webdriver.Chrome(options=chrome_options)  # 初始化浏览器对象，options参数使得浏览器不会弹出
-        base_url = "http://jxgl.tyut.edu.cn:999/"
-        browser.get(base_url)
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        browser = webdriver.Chrome(chrome_options=chrome_options)  # 初始化浏览器对象，options参数使得浏览器不会弹出
+        base_url = "http://jxgl.tyut.edu.cn:999/"  # 登录页网站
+        browser.get(base_url)  # 获取该网站信息
         browser.find_element_by_css_selector(".form-username ").send_keys(student_id)  # 帐号
         browser.find_element_by_css_selector(".form-password ").send_keys(password)  # 密码
         browser.find_element_by_css_selector(".btn").click()  # 登录
@@ -65,10 +76,12 @@ def login():
             demo = requests.get(current_url,headers=headers).text
             global student_name
             soup = BeautifulSoup(demo,'lxml')
-            student_name = soup.select(".user-info")[0].get_text().split()[-1]
+            student_name = soup.select(".user-info")[0].get_text().split()[-1]  # 根据网页源代码提取出登录用户的姓名
+            print()
+            print()
             print("登录成功,", student_name + " 同学，请输入你想获取什么信息？")
-            browser.quit()
-            return
+            browser.quit() # 登录成功，退出browser
+            return  # 已经登录成功，跳出该函数
         else:
             print("用户名或密码错误，请重新输入！")  # 输入错误后重新输入
 
@@ -80,10 +93,7 @@ def get_ranking():
     try:
         url = "http://jxgl.tyut.edu.cn:999/Tschedule/C6Cjgl/GetXskccjResult"
         data = {'order': 'zxjxjhh desc,kch'}
-        data = parse.urlencode(data).encode('gbk')
-        req = request.Request(url, data=data, headers=headers)
-        response = request.urlopen(req)
-        html = response.read().decode('utf-8')
+        html = get_html(url,data)
         soup = BeautifulSoup(html,'lxml')
         for i , j in zip(soup.select(".profile-info-name"),soup.select(".profile-info-value")):
             print(i.get_text(),end=" "+j.get_text())
@@ -98,10 +108,7 @@ def get_grades():
     try:
         url = 'http://jxgl.tyut.edu.cn:999/Tschedule/C6Cjgl/GetKccjResult'
         data = {'order': 'zxjxjhh desc,kch'}
-        data = parse.urlencode(data).encode('gbk')
-        req = request.Request(url, data=data, headers=headers)
-        response = request.urlopen(req)
-        html = response.read().decode('utf-8')
+        html = get_html(url,data)
         soup = BeautifulSoup(html, 'lxml')
         print("获取成绩成功！")
         print()
@@ -137,75 +144,81 @@ def get_grades():
             print()
             print()
     except Exception:
-        print('获取排名失败！')
+        print('获取成绩失败！')
         print("不好意思同学，大概率是学校网站崩了，或者是学校网站改动了，我会尽快处理的。")
 
 
 def get_course():
-    filename = student_name + '同学的课程表.xlsx'
-    if os.path.exists(filename):
-        print("你已经生成课表了呦，请到对应目录查看！")
-        return
-    print('正在获取课表信息，即将生成课表文件。。。')
-    url = 'http://jxgl.tyut.edu.cn:999/Tresources/A1Xskb/GetXsKb'
-    data = {'zxjxjhh': ''}
-    data = parse.urlencode(data).encode('gbk')
-    req = request.Request(url, data=data, headers=headers)
-    response = request.urlopen(req)
-    html = response.read().decode('utf-8')
-    soup = BeautifulSoup(html, 'lxml')
-    course_dict = soup.p.string
-    result = {}
-    for i in range(1, 6):
-        result[str(i)] = {}
-    x = json.loads(course_dict)
+    try:
+        filename = student_name + '同学的课程表.xlsx'
+        if os.path.exists(filename):
+            print()
+            print("你已经生成课表了，请到对应目录查看！")
+            return
+        print('正在获取课表信息，即将生成课表文件。。。')
+        url = 'http://jxgl.tyut.edu.cn:999/Tresources/A1Xskb/GetXsKb'
+        data = {'zxjxjhh': ''}
+        html = get_html(url,data)
+        # 清洗数据
+        soup = BeautifulSoup(html, 'lxml')
+        course_dict = soup.p.string
+        result = {}
+        for i in range(1, 6):
+            result[str(i)] = {}
+        x = json.loads(course_dict)
 
-    def course_detail(data):
-        result = []
-        result.append(data["Kcm"])
-        result.append(data["Zcsm"])
-        result.append(data["Dd"])
-        result.append(data['Jsm'])
-        result.append(data["Jc"])
-        result.append(data['Skxq'])
-        return result
+        def course_detail(data):
+            result = []
+            result.append(data["Kcm"])  # 课程名
+            result.append(data["Zcsm"])  # 周长数名
+            result.append(data["Dd"])  # 地点
+            result.append(data['Jsm'])  # 讲师名
+            result.append(data["Jc"])  # 上课时间
+            result.append(data['Skxq'])  # 上课星期
+            return result
 
-    for i in x["rows"]:
-        res = course_detail(i)
-        if res[-1] != None:
-            index = str(res[-1])
-            result[index].setdefault(res[-2], []).append(res[:-2])
-    date = ['星期一', '星期二', '星期三', '星期四', '星期五']
-    course_time = ['1-2', '3-4', '5-6', '7-8']
-    book = xlwt.Workbook(encoding='utf-8')
-    sheet = book.add_sheet('sheet1')
-    style = xlwt.XFStyle()  # 初始化样式
-    style.alignment.wrap = 1  # 自动换行
-    for i in range(8):
-        first_col = sheet.col(i)  # xlwt中是行和列都是从0开始计算的
-        first_col.width = 256 * 20
-    tall_style = xlwt.easyxf('font:height 720;')
-    for i in range(12):  # 36pt,类型小初的字号
-        first_row = sheet.row(i)
-        first_row.set_style(tall_style)
+        for i in x["rows"]:
+            res = course_detail(i) # 对每一个rows筛选出有用的数据
+            if res[-1] != None:
+                index = str(res[-1])  # index就是课程的星期
+                result[index].setdefault(res[-2], []).append(res[:-2])  # 以上课时间为键，其余信息为值创建字典
+        date = ['星期一', '星期二', '星期三', '星期四', '星期五']
+        course_time = ['1-2', '3-4', '5-6', '7-8']
+        f = open('course_dict.txt','w')
+        f.write(str(result))
+        f.close()
+        book = xlwt.Workbook(encoding='utf-8')  # 创建excel表
+        sheet = book.add_sheet('sheet1') # excel表的sheet信息
+        style = xlwt.XFStyle()  # 初始化样式
+        style.alignment.wrap = 1  # 自动换行
+        for i in range(8):
+            first_col = sheet.col(i)  # xlwt中是行和列都是从0开始计算的
+            first_col.width = 256 * 20
+        tall_style = xlwt.easyxf('font:height 720;')
+        for i in range(12):  # 36pt,类型小初的字号
+            first_row = sheet.row(i)
+            first_row.set_style(tall_style)
 
-    for i in range(len(date)):
-        sheet.write(0, i + 1, date[i], style)
-    for i in range(len(course_time)):
-        sheet.write(i + 1, 0, course_time[i], style)
-    for i in result:
-        for course_jie in result[i]:
-            strs = ""
-            for lengths in range(len(result[i][course_jie])):
-                strs += "\n".join(result[i][course_jie][lengths])
-                strs += "\n"
-            sheet.write(int(int(course_jie[-1]) / 2), int(i), strs, style)
-    book.save(filename)
-    print("生成课表'"+filename+"'成功,请到对应目录查看！")
+        for i in range(len(date)):  # 写入星期信息
+            sheet.write(0, i + 1, date[i], style)
+        for i in range(len(course_time)): # 写入上课时间信息
+            sheet.write(i + 1, 0, course_time[i], style)
+        for i in result:
+            for course_jie in result[i]:
+                strs = ""
+                for lengths in range(len(result[i][course_jie])):
+                    strs += "\n".join(result[i][course_jie][lengths])
+                    strs += "\n"
+                sheet.write(int(int(course_jie[-1]) / 2), int(i), strs, style)
+        book.save(filename)
+        print()
+        print("生成课表'"+filename+"'成功,请到对应目录查看！")
+    except Exception as err:
+        print('获取课表失败！')
+        print("不好意思同学，大概率是学校网站崩了，或者是学校网站改动了，我会尽快处理的。")
+        print(err)
 
 
-
-    
 def main():
     login()
     while True:
@@ -222,6 +235,7 @@ def main():
             print("退出成功，欢迎下次使用！")
             break
         else:
+            print()
             print("同学，请输入1,2,3,0来选取对应内容！")
 
 
